@@ -268,7 +268,9 @@ select.in option{color:#111}
 .opt .mn{font-family:'Jua';font-size:26px;flex:none}
 .opt.c0{border-left:8px solid var(--p1)}.opt.c1{border-left:8px solid var(--p2)}.opt.c2{border-left:8px solid var(--p3)}.opt.c3{border-left:8px solid var(--p4)}
 button.opt{cursor:pointer;transition:.15s}
-button.opt:hover:not(:disabled){background:#ffffff22;border-color:var(--gold);transform:translateY(-2px)}
+@media (hover:hover){button.opt:hover:not(:disabled){background:#ffffff22;border-color:var(--gold);transform:translateY(-2px)}}
+button.opt{-webkit-tap-highlight-color:transparent}
+button.opt:focus{outline:none}
 button.opt:disabled{cursor:default}
 .opt.dim{opacity:.4}
 .opt.right{background:#3ddc9733;border-color:var(--ok);opacity:1}
@@ -375,8 +377,10 @@ function confetti(){const E=['⭐','✨','🚀','🌟','🎉','🪐'];for(let i=
 
 /* ---------- helpers ---------- */
 function rng(seed){let h=1779033703^seed.length;for(let i=0;i<seed.length;i++){h=Math.imul(h^seed.charCodeAt(i),3432918353);h=h<<13|h>>>19}return()=>{h=Math.imul(h^(h>>>16),2246822507);h=Math.imul(h^(h>>>13),3266489909);h^=h>>>16;return(h>>>0)/4294967296}}
+const total=()=>S.room?.total||QUIZ.length;
+const qa=qi=>QUIZ[S.room?.order?.[qi]??qi];
 const optCache={};
-function getOpts(qi){const k=S.code+'_'+qi;if(optCache[k])return optCache[k];const it=QUIZ[qi];let o;
+function getOpts(qi){const k=S.code+'_'+qi;if(optCache[k])return optCache[k];const it=qa(qi);let o;
   if(it.ox)o=['O','X'];else{o=[it.a,...it.w];const r=rng(k);for(let i=o.length-1;i>0;i--){const j=Math.floor(r()*(i+1));[o[i],o[j]]=[o[j],o[i]]}}
   return optCache[k]=o}
 const plist=()=>Object.entries(S.room?.players||{}).map(([id,p])=>({id,score:0,correct:0,fastCnt:0,msSum:0,...p}));
@@ -396,26 +400,30 @@ function leave(silent){try{localStorage.removeItem('qz_host');localStorage.remov
   if(S.unsub)S.unsub();Object.assign(S,{role:null,code:null,pid:null,room:null,picked:{},unsub:null,finalShown:false});home()}
 
 /* ---------- home ---------- */
+addEventListener('hashchange',()=>{if(!S.role)home()});
 function home(){
-  app.innerHTML=`<div class="hero"><span class="tag">🚀 실시간 퀴즈 대결</span><h1>우주탐사의 역사<br>퀴즈 대결</h1><p>선생님이 방을 만들고, 학생은 방 코드를 입력해 참여해요</p>${db?'':'<p style="color:var(--gold)">⚠️ 이 화면은 미리보기라 실시간 연결이 안 돼요. 배포한 링크에서 열어 주세요</p>'}</div>
-  <div class="duo">
-   <div class="pane"><h3>🧑‍🏫 선생님</h3><p>문제 ${QUIZ.length}개 · 정답 점수 + 빠를수록 보너스</p>
-     <select class="in" id="lim"><option value="10">문제당 10초</option><option value="15">문제당 15초</option><option value="20" selected>문제당 20초</option><option value="30">문제당 30초</option></select>
-     <button class="btn primary" id="mk">방 만들기</button></div>
-   <div class="pane"><h3>🧑‍🎓 학생</h3><p>선생님 화면의 방 코드를 입력하세요</p>
+  const T=location.hash==='#t'||location.hash==='#teacher';
+  const warn=db?'':'<p style="color:var(--gold)">⚠️ 이 화면은 미리보기라 실시간 연결이 안 돼요. 배포한 링크에서 열어 주세요</p>';
+  const stu=`<div class="pane"><h3>🧑‍🎓 학생</h3><p>선생님 화면의 방 코드를 입력하세요</p>
      <input class="in" id="jc" inputmode="numeric" maxlength="4" placeholder="방 코드 4자리">
      <input class="in" id="jn" maxlength="8" placeholder="이름 (8자 이내)">
-     <button class="btn primary" id="jb">참여하기</button></div>
-  </div>`;
-  $('#mk').onclick=createRoom;$('#jb').onclick=joinRoom;
-  $('#jn').onkeydown=e=>{if(e.key==='Enter')joinRoom()};
+     <button class="btn primary" id="jb">참여하기</button></div>`;
+  const tea=`<div class="pane"><h3>🧑‍🏫 선생님</h3><p>정답 점수 + 빠를수록 보너스</p>
+     <select class="in" id="cnt"><option value="5">문제 5개</option><option value="10">문제 10개</option><option value="15">문제 15개</option><option value="20">문제 20개</option><option value="${QUIZ.length}" selected>문제 전체 ${QUIZ.length}개</option></select>
+     <select class="in" id="lim"><option value="10">문제당 10초</option><option value="15">문제당 15초</option><option value="20" selected>문제당 20초</option><option value="30">문제당 30초</option></select>
+     <button class="btn primary" id="mk">방 만들기</button></div>`;
+  app.innerHTML=`<div class="hero"><span class="tag">🚀 실시간 퀴즈 대결</span><h1>우주탐사의 역사<br>퀴즈 대결</h1><p>${T?'선생님 전용 화면이에요':'선생님이 알려 준 방 코드를 입력해 참여해요'}</p>${warn}</div>
+  <div class="duo" style="grid-template-columns:1fr;max-width:420px">${T?tea:stu}</div>`;
+  if(T){$('#mk').onclick=createRoom}
+  else{$('#jb').onclick=joinRoom;$('#jn').onkeydown=e=>{if(e.key==='Enter')joinRoom()}}
 }
 async function createRoom(){
   if(!db)return toast(NODB);
   actx=actx||null;tone(1,.01);
-  const limit=+$('#lim').value;let code,tries=0;
+  const limit=+$('#lim').value,cnt=+$('#cnt').value;let code,tries=0;
+  const order=[...Array(QUIZ.length).keys()].sort(()=>Math.random()-.5).slice(0,cnt).sort((a,b)=>a-b);
   try{do{code=String(1000+Math.floor(Math.random()*9000));tries++}while((await get(ref(db,'rooms/'+code))).exists()&&tries<20);
-    await set(ref(db,'rooms/'+code),{created:serverTimestamp(),limit,state:'lobby',qi:-1,total:QUIZ.length});
+    await set(ref(db,'rooms/'+code),{created:serverTimestamp(),limit,state:'lobby',qi:-1,total:cnt,order});
   }catch(e){console.error(e);return toast('방을 만들지 못했어요 ('+((e&&(e.code||e.message))||'알 수 없는 오류')+')')}
   S.role='host';S.code=code;try{localStorage.setItem('qz_host',JSON.stringify({code}))}catch(e){}
   attach();
@@ -441,11 +449,11 @@ async function joinRoom(){
 /* ---------- host actions ---------- */
 const hostStart=()=>nextQ();
 function nextQ(){const r=S.room;const qi=r.qi+1;S.revealing=false;
-  if(qi>=QUIZ.length)return update(R(),{state:'final',finalAt:serverTimestamp()});
+  if(qi>=total())return update(R(),{state:'final',finalAt:serverTimestamp()});
   return update(R(),{state:'question',qi,qStart:serverTimestamp()})}
 async function reveal(){
   const r=S.room;if(!r||r.state!=='question'||S.revealing)return;S.revealing=true;
-  const qi=r.qi,it=QUIZ[qi],ci=getOpts(qi).indexOf(it.ox||it.a),lim=r.limit*1000,A=r.answers?.[qi]||{};
+  const qi=r.qi,it=qa(qi),ci=getOpts(qi).indexOf(it.ox||it.a),lim=r.limit*1000,A=r.answers?.[qi]||{};
   const res={};let fast=null;
   for(const [pid,a] of Object.entries(A)){if(!r.players?.[pid])continue;
     const ms=Math.min(Math.max(+a.ms||0,0),lim),ok=a.c===ci;
@@ -495,7 +503,7 @@ function hostLobby(r){
   const n=Object.keys(r.players||{}).length;
   app.innerHTML=`${topbar('🚀 우주탐사의 역사 퀴즈 대결')}
   <div class="center"><p class="hint">학생 기기에서 이 페이지를 열고 <b>학생 → 방 코드</b>를 입력하세요</p><div class="bigcode">${S.code}</div>
-  <p class="hint">문제 ${QUIZ.length}개 · 문제당 ${r.limit}초 · 참여 <b style="color:var(--gold)">${n}</b>명</p>
+  <p class="hint">문제 ${total()}개 · 문제당 ${r.limit}초 · 참여 <b style="color:var(--gold)">${n}</b>명</p>
   <div class="pls">${plChips()||'<span class="hint">아직 아무도 없어요…</span>'}</div>
   <button class="btn primary" id="st" ${n?'':'disabled'}>퀴즈 시작! 🚀</button></div>`;
   $('#st').onclick=()=>{tone(1,.01);hostStart()};bindLeave();
@@ -506,14 +514,14 @@ function playerLobby(r){
   <div class="pls">${plChips()}</div></div>`;bindLeave();
 }
 
-function qHead(r,extra=''){const n=QUIZ.length,it=QUIZ[r.qi];
+function qHead(r,extra=''){const n=total(),it=qa(r.qi);
   return `<div class="prog"><i style="width:${(r.qi+(r.state==='reveal'?1:0))/n*100}%"></i></div>
   <div class="hbar"><i id="tbar" style="width:${r.state==='question'?leftMs(r)/(r.limit*1000)*100:0}%"></i></div>
   <div class="qcard"><span class="qno">${r.qi+1} / ${n}</span><span class="qtype">${it.ox?'O / X':'객관식'}</span>${extra}
   <div class="qtext">${esc(it.q)}</div>`}
 
 function hostQ(r){
-  const it=QUIZ[r.qi],o=getOpts(r.qi),done=Object.keys(r.answers?.[r.qi]||{}).length,n=Object.keys(r.players||{}).length;
+  const it=qa(r.qi),o=getOpts(r.qi),done=Object.keys(r.answers?.[r.qi]||{}).length,n=Object.keys(r.players||{}).length;
   const body=it.ox?`<div class="oxrow">${o.map((x,k)=>`<div class="opt ob${k}">${x}</div>`).join('')}</div>`
    :`<div class="opts">${o.map((x,k)=>`<div class="opt c${k}"><span class="mn">${'①②③④'[k]}</span><span>${esc(x)}</span></div>`).join('')}</div>`;
   app.innerHTML=`${topbar('문제 풀이 중',`<span class="chip">제출 ${done} / ${n}</span><span class="timer" id="tm">${Math.ceil(leftMs(r)/1000)}</span>`)}
@@ -521,7 +529,7 @@ function hostQ(r){
   $('#sk').onclick=reveal;bindLeave();
 }
 function playerQ(r){
-  const it=QUIZ[r.qi],o=getOpts(r.qi),mine=S.picked[r.qi];
+  const it=qa(r.qi),o=getOpts(r.qi),mine=S.picked[r.qi];
   const body=it.ox?`<div class="oxrow">${o.map((x,k)=>`<button class="opt ob${k} ${mine===undefined?'':mine===k?'mine':'dim'}" data-k="${k}" ${mine===undefined?'':'disabled'}>${x}</button>`).join('')}</div>`
    :`<div class="opts">${o.map((x,k)=>`<button class="opt c${k} ${mine===undefined?'':mine===k?'mine':'dim'}" data-k="${k}" ${mine===undefined?'':'disabled'}><span class="mn">${'①②③④'[k]}</span><span>${esc(x)}</span></button>`).join('')}</div>`;
   app.innerHTML=`${topbar(esc(S.name),`<span class="timer" id="tm">${Math.ceil(leftMs(r)/1000)}</span>`)}
@@ -531,14 +539,14 @@ function playerQ(r){
 
 let lastRevealSfx=-1;
 function hostReveal(r){
-  const it=QUIZ[r.qi],o=getOpts(r.qi),ci=o.indexOf(it.ox||it.a),A=r.answers?.[r.qi]||{},res=r.results?.[r.qi]||{};
+  const it=qa(r.qi),o=getOpts(r.qi),ci=o.indexOf(it.ox||it.a),A=r.answers?.[r.qi]||{},res=r.results?.[r.qi]||{};
   const cnt=o.map((_,k)=>Object.values(A).filter(a=>a.c===k).length),tot=Object.keys(A).length||1;
   const row=(x,k)=>`<div class="opt ${it.ox?'ob'+k:'c'+k} ${k===ci?'right':'dim'}"><div class="fill" style="width:${cnt[k]/tot*100}%"></div><span class="mn">${it.ox?'':'①②③④'[k]}</span><span>${esc(x)}</span><span class="cnt">${cnt[k]}명</span></div>`;
   const body=it.ox?`<div class="oxrow">${o.map((x,k)=>`<div class="opt ob${k} ${k===ci?'right':'dim'}" style="flex-direction:column;gap:2px">${x}<span class="cnt" style="margin:0;font-size:24px">${cnt[k]}명</span></div>`).join('')}</div>`
    :`<div class="opts">${o.map(row).join('')}</div>`;
   const f=r.fast?.[r.qi],fp=f&&r.players?.[f];
   const top=ranked().slice(0,5);
-  const last=r.qi===QUIZ.length-1;
+  const last=r.qi===total()-1;
   app.innerHTML=`${topbar('정답 공개',`<span class="chip">정답 ${Object.values(res).filter(x=>x.ok).length} / ${Object.keys(r.players||{}).length}명</span>`)}
   ${qHead(r)}${body}
   ${fp?`<div class="fastbox">⚡ 가장 빨리 맞힌 사람: <b style="color:var(--gold)">${esc(fp.name)}</b> (${sec(res[f].ms)})</div>`:'<div class="fastbox">아무도 못 맞혔어요 😅</div>'}</div>
@@ -548,9 +556,9 @@ function hostReveal(r){
   if(lastRevealSfx!==r.qi){lastRevealSfx=r.qi;sfx.fan()}
 }
 function playerReveal(r){
-  const res=r.results?.[r.qi]?.[S.pid],it=QUIZ[r.qi],o=getOpts(r.qi),ci=o.indexOf(it.ox||it.a),rk=ranked(),my=rk.findIndex(p=>p.id===S.pid)+1,me=r.players?.[S.pid]||{score:0};
+  const res=r.results?.[r.qi]?.[S.pid],it=qa(r.qi),o=getOpts(r.qi),ci=o.indexOf(it.ox||it.a),rk=ranked(),my=rk.findIndex(p=>p.id===S.pid)+1,me=r.players?.[S.pid]||{score:0};
   const f=r.fast?.[r.qi];
-  app.innerHTML=`${topbar(esc(S.name))}<div class="qcard center"><span class="qno">${r.qi+1} / ${QUIZ.length}</span>
+  app.innerHTML=`${topbar(esc(S.name))}<div class="qcard center"><span class="qno">${r.qi+1} / ${total()}</span>
   <div class="resbig">${res?(res.ok?'⭕':'❌'):'⏰'}</div>
   <p class="pts">${res?(res.ok?'+'+res.pts+'점':'0점'):'시간 초과'}</p>
   ${res?.bonus?'<div class="fastbox">⚡ 가장 빨리 맞혔어요! (+100)</div>':''}
@@ -565,7 +573,7 @@ function awards(r){
   const bf=[...P].filter(p=>p.fastCnt>0).sort((a,b)=>b.fastCnt-a.fastCnt||avg(a)-avg(b))[0];
   const ba=[...P].filter(p=>p.correct>0).sort((a,b)=>avg(a)-avg(b))[0];
   let best=null;for(const [qi,m] of Object.entries(r.results||{}))for(const [pid,x] of Object.entries(m))if(x.ok&&(!best||x.ms<best.ms)&&r.players?.[pid])best={pid,ms:x.ms,qi:+qi};
-  if(bc&&bc.correct>0)out.push({ic:'🎯',tt:'정답왕',nn:bc.name,dd:`${QUIZ.length}문제 중 ${bc.correct}개 정답`});
+  if(bc&&bc.correct>0)out.push({ic:'🎯',tt:'정답왕',nn:bc.name,dd:`${total()}문제 중 ${bc.correct}개 정답`});
   if(bf)out.push({ic:'⚡',tt:'스피드왕 (가장 빨리 맞힌 횟수)',nn:bf.name,dd:`${bf.fastCnt}번 1등`});
   if(best)out.push({ic:'🌠',tt:'번개 기록 (가장 빠른 정답 한 번)',nn:r.players[best.pid].name,dd:`${best.qi+1}번 문제 · ${sec(best.ms)}`});
   if(ba)out.push({ic:'🏃',tt:'평균 정답 속도 1위',nn:ba.name,dd:`평균 ${sec(avg(ba))}`});
