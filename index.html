@@ -310,10 +310,8 @@ button.opt:disabled{cursor:default}
 </style>
 </head>
 <body>
-<div id="app" class="wrap"></div>
+<div id="app" class="wrap"><p style="text-align:center;padding:40vh 0;color:#a9b2d6;font-size:20px">🚀 불러오는 중…</p></div>
 <script type="module">
-import {initializeApp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import {getDatabase,ref,set,get,update,remove,onValue,push,serverTimestamp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
 const firebaseConfig={
   apiKey:"AIzaSyCQwpk19h2W62fSJ2-cn5IwBRElRpL41lU",
@@ -324,7 +322,15 @@ const firebaseConfig={
   messagingSenderId:"798483171621",
   appId:"1:798483171621:web:1e6ffaa08087a6f6e832cc"
 };
-const db=getDatabase(initializeApp(firebaseConfig));
+let db=null,ref,set,get,update,remove,onValue,push,serverTimestamp;
+try{
+  const tm=new Promise((_,j)=>setTimeout(j,6000));
+  const A=await Promise.race([import("https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js"),tm]);
+  const D=await Promise.race([import("https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js"),tm]);
+  ({ref,set,get,update,remove,onValue,push,serverTimestamp}=D);
+  db=D.getDatabase(A.initializeApp(firebaseConfig));
+}catch(e){db=null}
+const NODB='이 화면에서는 실시간 연결을 쓸 수 없어요. 배포한 링크에서 열어 주세요';
 
 // ox: O/X 문제, a: 정답 보기, w: 오답 보기 3개 (보기 순서는 매번 섞임)
 const QUIZ=[
@@ -356,7 +362,7 @@ const $=s=>document.querySelector(s);
 const app=$('#app');
 const esc=s=>String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 const S={role:null,code:null,pid:null,name:'',room:null,offset:0,picked:{},revealing:false,unsub:null,finalShown:false};
-onValue(ref(db,'.info/serverTimeOffset'),s=>{S.offset=s.val()||0});
+if(db)onValue(ref(db,'.info/serverTimeOffset'),s=>{S.offset=s.val()||0});
 const now=()=>Date.now()+S.offset;
 const R=p=>ref(db,'rooms/'+S.code+(p?'/'+p:''));
 const toast=m=>{document.querySelectorAll('.toast').forEach(x=>x.remove());const d=document.createElement('div');d.className='toast';d.textContent=m;document.body.appendChild(d);setTimeout(()=>d.remove(),2600)};
@@ -391,7 +397,7 @@ function leave(silent){try{localStorage.removeItem('qz_host');localStorage.remov
 
 /* ---------- home ---------- */
 function home(){
-  app.innerHTML=`<div class="hero"><span class="tag">🚀 실시간 퀴즈 대결</span><h1>우주탐사의 역사<br>퀴즈 대결</h1><p>선생님이 방을 만들고, 학생은 방 코드를 입력해 참여해요</p></div>
+  app.innerHTML=`<div class="hero"><span class="tag">🚀 실시간 퀴즈 대결</span><h1>우주탐사의 역사<br>퀴즈 대결</h1><p>선생님이 방을 만들고, 학생은 방 코드를 입력해 참여해요</p>${db?'':'<p style="color:var(--gold)">⚠️ 이 화면은 미리보기라 실시간 연결이 안 돼요. 배포한 링크에서 열어 주세요</p>'}</div>
   <div class="duo">
    <div class="pane"><h3>🧑‍🏫 선생님</h3><p>문제 ${QUIZ.length}개 · 정답 점수 + 빠를수록 보너스</p>
      <select class="in" id="lim"><option value="10">문제당 10초</option><option value="15">문제당 15초</option><option value="20" selected>문제당 20초</option><option value="30">문제당 30초</option></select>
@@ -405,20 +411,22 @@ function home(){
   $('#jn').onkeydown=e=>{if(e.key==='Enter')joinRoom()};
 }
 async function createRoom(){
+  if(!db)return toast(NODB);
   actx=actx||null;tone(1,.01);
   const limit=+$('#lim').value;let code,tries=0;
   try{do{code=String(1000+Math.floor(Math.random()*9000));tries++}while((await get(ref(db,'rooms/'+code))).exists()&&tries<20);
     await set(ref(db,'rooms/'+code),{created:serverTimestamp(),limit,state:'lobby',qi:-1,total:QUIZ.length});
-  }catch(e){return toast('방을 만들지 못했어요. Firebase 규칙을 확인해 주세요')}
+  }catch(e){console.error(e);return toast('방을 만들지 못했어요 ('+((e&&(e.code||e.message))||'알 수 없는 오류')+')')}
   S.role='host';S.code=code;try{localStorage.setItem('qz_host',JSON.stringify({code}))}catch(e){}
   attach();
 }
 async function joinRoom(){
+  if(!db)return toast(NODB);
   const code=$('#jc').value.trim(),name=$('#jn').value.trim().slice(0,8);
   if(!/^\d{4}$/.test(code))return toast('방 코드 4자리를 입력해 주세요');
   if(!name)return toast('이름을 입력해 주세요');
   tone(1,.01);
-  let snap;try{snap=await get(ref(db,'rooms/'+code))}catch(e){return toast('연결에 실패했어요. 잠시 후 다시 시도해 주세요')}
+  let snap;try{snap=await get(ref(db,'rooms/'+code))}catch(e){console.error(e);return toast('연결 실패 ('+((e&&(e.code||e.message))||'알 수 없는 오류')+')')}
   if(!snap.exists())return toast('없는 방 코드예요');
   const room=snap.val();
   if(room.state==='final')return toast('이미 끝난 퀴즈예요');
@@ -583,6 +591,7 @@ function finalScreen(r){
 
 /* ---------- resume ---------- */
 (async()=>{
+  if(!db)return;
   try{const h=JSON.parse(localStorage.getItem('qz_host')||'null');
     if(h&&(await get(ref(db,'rooms/'+h.code))).exists()){S.role='host';S.code=h.code;return attach()}
     const p=JSON.parse(localStorage.getItem('qz_pl')||'null');
